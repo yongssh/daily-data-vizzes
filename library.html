@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+  body {
+    font-family: sans-serif;
+  }
+  .node rect {
+    cursor: move;
+    fill-opacity: 0.9;
+    shape-rendering: crispEdges;
+  }
+  .node text {
+    pointer-events: none;
+    text-shadow: 0 1px 0 #fff;
+    font-size: 13px;
+  }
+  .link {
+    fill: none;
+    stroke-opacity: 0.4;
+  }
+  .link:hover {
+    stroke-opacity: 0.7;
+  }
+  .tooltip {
+    position: absolute;
+    text-align: left;
+    padding: 6px 10px;
+    font-size: 13px;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    pointer-events: none;
+    box-shadow: 0px 0px 5px rgba(0,0,0,0.2);
+  }
+</style>
+<body>
+<svg id="sankey" width="900" height="600"></svg>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+<script>
+const data = [
+  { name: "Cook County", value: 0.493 },
+  { name: "City of Evanston", value: 1.296 },
+  { name: "Evanston Public Library", value: 0.221 },
+  { name: "Evanston General Assistance", value: 0.029 },
+  { name: "School District 65 (K-8)", value: 3.322 },
+  { name: "School District 202 (ETHS)", value: 2.112 },
+  { name: "Oakton Community College", value: 0.227 },
+  { name: "Metro Water Reclamation District", value: 0.345 },
+  { name: "North Shore Mosquito Abatement", value: 0.008 },
+  { name: "Lighthouse Park District", value: 0.072 },
+  { name: "Ridgeville Park District", value: 0.106 }
+];
+
+const total = 8.026;
+
+const nodes = [
+  { name: "Total Taxes" },
+  ...data.map(d => ({ name: d.name }))
+];
+
+const links = data.map(d => ({
+  source: 0,
+  target: nodes.findIndex(n => n.name === d.name),
+  value: d.value
+}));
+
+const width = 900, height = 600;
+
+const svg = d3.select("#sankey")
+    .attr("viewBox", [0, 0, width, height]);
+
+const sankey = d3.sankey()
+    .nodeWidth(20)
+    .nodePadding(15)
+    .extent([[1, 1], [width - 1, height - 6]]);
+
+const {nodes: graphNodes, links: graphLinks} = sankey({
+  nodes: nodes.map(d => Object.assign({}, d)),
+  links: links.map(d => Object.assign({}, d))
+});
+
+const color = d3.scaleLinear()
+  .domain([0, graphNodes.length / 2, graphNodes.length - 1])
+  .range(["#501e4c", "#8e5ea7", "#d8cdef"]);
+
+// Tooltip
+const tooltip = d3.select("body")
+  .append("div")
+  .attr("class", "tooltip")
+  .style("opacity", 0);
+
+// Links
+svg.append("g")
+  .attr("fill", "none")
+  .selectAll("path")
+  .data(graphLinks)
+  .join("path")
+    .attr("d", d3.sankeyLinkHorizontal())
+    .attr("stroke", d => color(d.target.index))
+    .attr("stroke-width", d => Math.max(1, d.width))
+    .attr("class", "link")
+    .on("mouseover", function(event, d) {
+      tooltip.transition().duration(150).style("opacity", .95);
+      tooltip.html(`<strong>${graphNodes[d.source.index].name} → ${graphNodes[d.target.index].name}</strong><br/>
+                    Value: ${d.value.toFixed(3)}<br/>
+                    Share: ${(d.value/total*100).toFixed(1)}%`)
+             .style("left", (event.pageX + 10) + "px")
+             .style("top", (event.pageY - 20) + "px");
+    })
+    .on("mousemove", function(event) {
+      tooltip.style("left", (event.pageX + 10) + "px")
+             .style("top", (event.pageY - 20) + "px");
+    })
+    .on("mouseout", function() {
+      tooltip.transition().duration(200).style("opacity", 0);
+    });
+
+// Nodes
+const node = svg.append("g")
+  .selectAll("g")
+  .data(graphNodes)
+  .join("g")
+    .attr("class", "node");
+
+node.append("rect")
+    .attr("x", d => d.x0)
+    .attr("y", d => d.y0)
+    .attr("height", d => d.y1 - d.y0)
+    .attr("width", d => d.x1 - d.x0)
+    .attr("fill", d => color(d.index))
+    .on("mouseover", function(event, d) {
+      tooltip.transition().duration(150).style("opacity", .95);
+      tooltip.html(`<strong>${d.name}</strong><br/>
+                    Value: ${d.value ? d.value.toFixed(3) : "—"}<br/>
+                    Share: ${d.value ? (d.value/total*100).toFixed(1) + "%" : "—"}`)
+             .style("left", (event.pageX + 10) + "px")
+             .style("top", (event.pageY - 20) + "px");
+    })
+    .on("mousemove", function(event) {
+      tooltip.style("left", (event.pageX + 10) + "px")
+             .style("top", (event.pageY - 20) + "px");
+    })
+    .on("mouseout", function() {
+      tooltip.transition().duration(200).style("opacity", 0);
+    });
+
+node.append("text")
+    .attr("x", d => d.x0 - 6)
+    .attr("y", d => (d.y1 + d.y0) / 2)
+    .attr("dy", "0.35em")
+    .attr("text-anchor", "end")
+    .text(d => d.name)
+  .filter(d => d.x0 < width / 2)
+    .attr("x", d => d.x1 + 6)
+    .attr("text-anchor", "start");
+</script>
+</body>
+</html>
